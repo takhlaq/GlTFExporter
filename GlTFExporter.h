@@ -257,7 +257,16 @@ public:
       ~Group() {}
       void addGroup(GroupPtr pGroup)
       {
-         //pGroup->parent = shared_from_this();
+         // todo: this is fuckin stupid, fix it legit
+         for (auto pSubGroup : subGroups)
+            if (pSubGroup->name == pGroup->name)
+            {
+               for (auto pModel : pGroup->models)
+                  pSubGroup->models.push_back(pModel);
+
+               pGroup->models.clear();
+               return;
+            }
          subGroups.push_back(pGroup);
       }
    };
