@@ -103,6 +103,7 @@ public:
    {
    public:
       float x{ 0 }, y{ 0 };
+      CVector2(float x, float y){ this->x = x; this->y = y; }
       CVector2() {}
       ~CVector2();
    };
@@ -110,13 +111,25 @@ public:
    {
    public:
       float x{ 0 }, y{ 0 }, z{ 0 };
+      CVector3(float x, float y, float z){ this->x = x; this->y = y; this->z = z; }
       CVector3() {}
       ~CVector3();
+
+      CVector3 Min(const CVector3& rhs) const
+      {
+         return CVector3(std::min(x, rhs.x), std::min(y, rhs.y), std::min(z, rhs.z));
+      }
+
+      CVector3 Max(const CVector3& rhs) const
+      {
+         return CVector3(std::max(x, rhs.x), std::max(y, rhs.y), std::max(z, rhs.z));
+      }
    };
    class CVector4
    {
    public:
       float x{ 0 }, y{ 0 }, z{ 0 }, w{ 0 };
+      CVector4(float x, float y, float z, float w){ this->x = x; this->y = y; this->z = z; this->w = w;}
       CVector4() {}
       ~CVector4();
    };
@@ -198,8 +211,7 @@ public:
 
       bool Mesh::operator== (const Mesh& rhs) const
       {
-         return id == rhs.id || name == rhs.name || (vertices.size() == rhs.vertices.size() && uv1.size() == rhs.uv1.size() &&
-            colors.size() == rhs.uv1.size() && normals.size() == rhs.normals.size() && indices.size() == rhs.indices.size());
+         return id == rhs.id || name == rhs.name;
       }
    };
 

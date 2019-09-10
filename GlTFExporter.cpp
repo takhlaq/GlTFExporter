@@ -34,7 +34,7 @@
 #endif
 #endif
 
-#include "../tinygltf/tiny_gltf.h"
+#include "tinygltf/tiny_gltf.h"
 
 //using MaterialPtr = GlTFExporter::MaterialPtr;
 //using MeshPtr = GlTFExporter::MeshPtr;
@@ -231,14 +231,14 @@ void GlTFExporter::exportAllMaterials()
    }
 }
 
-std::vector<double> vec3ToDoubleVec(const CVector3& v)
+std::vector<double> vec3ToDoubleVec(const GlTFExporter::CVector3& v)
 {
    std::vector<double> ret;
    ret.push_back(v.x); ret.push_back(v.y); ret.push_back(v.z);
    return ret;
 }
 
-std::vector<double> vec4ToDoubleVec(const CVector4& v)
+std::vector<double> vec4ToDoubleVec(const GlTFExporter::CVector4& v)
 {
    std::vector<double> ret;
    ret.push_back(v.x); ret.push_back(v.y); ret.push_back(v.z); ret.push_back(v.w);
@@ -577,7 +577,7 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
    if (exportDir[exportDir.size() - 1] != '/' && exportDir[exportDir.size() - 1] != '\\')
       exportDir += "/";
 
-   if (!std::experimental::filesystem::directory_exists(exportDir))
+   if (!std::experimental::filesystem::exists(exportDir))
       std::experimental::filesystem::create_directories(exportDir);
       
    if (scene.name == "")
