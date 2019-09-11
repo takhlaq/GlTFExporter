@@ -282,10 +282,7 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
    glMat.name = pMaterial->name;
    glMat.doubleSided = true;
    
-   std::ofstream file(exportDir + "MISSING_TEXTURES_" + pMaterial->name + ".txt", std::ios::trunc);
-   file.close();
-   file.open(exportDir + "MISSING_TEXTURES_" + pMaterial->name + ".txt", std::ios::app);
-
+   std::string debugStr;
    for (const auto& slotTexPair : pMaterial->textureMap)
    {
       tinygltf::TextureInfo glTexInfo;
@@ -340,10 +337,7 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
                }
                default:
                {
-                  std::string debugStr("MATERIAL: " + pMaterial->name + " ID: " + std::to_string(pGlModel->materials.size()) + "\n");
                   debugStr += "TEXTURE: " + pTex->name + " ID: " + std::to_string(pTex->glTextureId) + "\n";
-                  file.write(debugStr.c_str(), debugStr.size());
-                     //glMat.extensions["UNKNOWN_TEXTURE_SLOT_" + pTex->name].Keys().push_back(pTex->name);
                }
                break;
             }
@@ -351,7 +345,14 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
          //texCoordIndex++;
       }
    }
-   file.close();
+
+   if (!debugStr.empty())
+   {
+      std::string debugStr2("MATERIAL: " + pMaterial->name + " ID: " + std::to_string(pGlModel->materials.size()) + "\n");
+      debugStr2 += debugStr;
+      std::ofstream file(exportDir + "UNASSIGNED_TEXTURES_" + pMaterial->name + ".txt", std::ios::trunc);
+      file.write(debugStr2.c_str(), debugStr2.size());
+   }
    pGlModel->materials.push_back(glMat);
 }
 
