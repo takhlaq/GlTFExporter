@@ -71,6 +71,8 @@ void GlTFExporter::reset()
       meshIdMap.clear();
    if (!meshNameRefMap.empty())
       meshNameRefMap.clear();
+   if (!nameCount.empty())
+      nameCount.clear();
 }
 
 uint32_t GlTFExporter::addTransformedModelToGroup(TransformedModelPtr pModel, GroupPtr pGroup)
@@ -280,6 +282,10 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
    glMat.name = pMaterial->name;
    glMat.doubleSided = true;
    
+   std::ofstream file(exportDir + "MISSING_TEXTURES_" + pMaterial->name + ".txt", std::ios::trunc);
+   file.close();
+   file.open(exportDir + "MISSING_TEXTURES_" + pMaterial->name + ".txt", std::ios::app);
+
    for (const auto& slotTexPair : pMaterial->textureMap)
    {
       tinygltf::TextureInfo glTexInfo;
@@ -333,13 +339,19 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
                   glMat.pbrMetallicRoughness.metallicRoughnessTexture = glTexInfo;
                }
                default:
-                  glMat.extras.Keys().push_back("UNKNOWN_TEXTURE_" + pTex->filePath);
-                  break;
+               {
+                  std::string debugStr("MATERIAL: " + pMaterial->name + "\n");
+                  debugStr += "TEXTURE: " + pTex->name + "\n";
+                  file.write(debugStr.c_str(), debugStr.size());
+                     //glMat.extensions["UNKNOWN_TEXTURE_SLOT_" + pTex->name].Keys().push_back(pTex->name);
+               }
+               break;
             }
          }
          //texCoordIndex++;
       }
    }
+   file.close();
    pGlModel->materials.push_back(glMat);
 }
 
@@ -373,12 +385,12 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
    tinygltf::Node glNode;
    tinygltf::Mesh glMesh;
 
-   glNode.name = pModel->name;
+   glNode.name = pModel->name + "_" + std::to_string(nameCount[pModel->name]++);
    glNode.translation = vec3ToDoubleVec(pModel->transformation.translation);
    glNode.rotation = vec4ToDoubleVec(pModel->transformation.rotation);
    glNode.scale = vec3ToDoubleVec(pModel->transformation.scale);
 
-   glMesh.name = pModel->name;
+   glMesh.name = glNode.name;
 
    for (const auto& meshPair : pModel->meshes)
    {
@@ -518,7 +530,6 @@ void GlTFExporter::exportGlTFTransformedModel(TransformedModelPtr pTransformedMo
    glTNode.translation = vec3ToDoubleVec(tform.translation);
    glTNode.rotation = vec4ToDoubleVec(tform.rotation);
    glTNode.scale = vec3ToDoubleVec(tform.scale);
-   glTNode.name = modelIdMap[pTransformedModel->modelRef]->name;
 
    // get the actual model's node and add this as a child
    {
@@ -527,6 +538,8 @@ void GlTFExporter::exportGlTFTransformedModel(TransformedModelPtr pTransformedMo
       glTNode.mesh = pModel->glBufferId;
       
       modelNode.children.push_back(pGlModel->nodes.size());
+      glTNode.name = pModel->name + "_" + std::to_string(nameCount[pModel->name]++);;
+
    }
 
    if (pScene)
@@ -544,7 +557,7 @@ void GlTFExporter::exportGlTFGroup(GroupPtr pGroup, GlTFModelPtr pGlModel, tinyg
    std::shared_ptr<tinygltf::Node> glGroupNodePtr = std::make_shared<tinygltf::Node>();
 
    tinygltf::Node& glGroupNode = *glGroupNodePtr.get();
-   glGroupNode.name = pGroup->name;
+   glGroupNode.name = pGroup->name + "_" + std::to_string(nameCount[pGroup->name]++);
    glGroupNode.translation = vec3ToDoubleVec(tform.translation);
    glGroupNode.rotation = vec4ToDoubleVec(tform.rotation);
    glGroupNode.scale = vec3ToDoubleVec(tform.scale);
