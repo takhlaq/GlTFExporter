@@ -128,6 +128,8 @@ int main(int argc, char* argv[])
 
     for (auto i = 0; i < 10; ++i)
     {
+        // check if the group exists, if it does add the models to parent group
+        // if not make a new one
         std::string groupName("cubeGroup" + std::to_string(i));
         GlTFExporter::GroupPtr pSubGroup = exporter.getGroup(groupName);
         if (pSubGroup == nullptr)
@@ -152,6 +154,7 @@ int main(int argc, char* argv[])
             // add this instance to the exporter
             exporter.addTransformedModelToGroup(pTransformedModel, pRootGroup);
         }
+        // add subgroup to the root group cause its broken and rootgroup MUST contain all other groups and idk why
         pRootGroup->addGroup(pSubGroup);
     }
 
