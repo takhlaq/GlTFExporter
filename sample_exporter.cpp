@@ -89,15 +89,13 @@ int main(int argc, char* argv[])
     };
 
     std::vector<uint32_t> indices;
-    for (auto i = 0; i + 2 < vertices.size(); i += 2)
+    for (auto i = 0; i + 2 < vertices.size(); ++i)
     {
-        // todo: actually make a cube lmao
-        for (auto j = 0; j < 3; ++j)
+        for (auto j = 0; j < 2; ++j)
         {
-            //indices.push_back(i + j + 2);
-            indices.push_back(i + j + 1);
-            indices.push_back(i + j);
             indices.push_back(i);
+            indices.push_back(i + j);
+            indices.push_back(i + j + 1);
         }
     }
 
@@ -106,9 +104,11 @@ int main(int argc, char* argv[])
     // build mesh data
     GlTFExporter::MeshPtr pMesh = std::make_shared<GlTFExporter::Mesh>();
     pMesh->name = "cubeMesh";
-    pMesh->vertices = vertices;
-    pMesh->indices = indices;
-    pMesh->colors = colors;
+    pMesh->vertices = vertices; // for larger data consider std::move
+    pMesh->indices = indices;   // ^
+    pMesh->colors = colors;     // ^
+                                // todo: probably take pointer and length instead of vector?
+                              
 
     // model containing the meshes
     GlTFExporter::ModelPtr pModel = std::make_shared<GlTFExporter::Model>();
@@ -126,7 +126,9 @@ int main(int argc, char* argv[])
     // add this model to the exporter so other nodes can reference it
     exporter.addModel(pModel);
 
-    for (auto i = 0; i < 10; ++i)
+    // means nothing, just to spread shit out
+    int shittyCounter = -15;
+    for (auto i = 0; i < 3; ++i)
     {
         // check if the group exists, if it does add the models to parent group
         // if not make a new one
@@ -136,24 +138,29 @@ int main(int argc, char* argv[])
         {
             pSubGroup = std::make_shared<GlTFExporter::Group>();
             pSubGroup->name = groupName;
+            pSubGroup->transformation.translation = GlTFExporter::CVector3(i * 100, i, -i * 100);
         }
-
-        for (auto j = 3; j < 10; j += 3)
+        for (auto j = 0; j < 2; ++j)
         {
-            // add each transformation of the model pointed to by pTransformedModel->modelRef
-            // this would be looked up via exporter.getModel(const std::string& name)
-            GlTFExporter::TransformedModelPtr pTransformedModel = std::make_shared<GlTFExporter::TransformedModel>();
+            for (auto k = 0; k < 2; ++k)
+            {
+                // add each transformation of the model pointed to by pTransformedModel->modelRef
+                // this would be looked up via exporter.getModel(const std::string& name)
+                GlTFExporter::TransformedModelPtr pTransformedModel = std::make_shared<GlTFExporter::TransformedModel>();
             
-            // add a reference to the model we want to create copies off
-            pTransformedModel->modelRef = pModel->id;
+                // add a reference to the model we want to create copies off
+                pTransformedModel->modelRef = pModel->id;
             
-            // make things move
-            pTransformedModel->transformation.translation = GlTFExporter::CVector3(i * j * 10, i, i * -j * 10);
-            pTransformedModel->transformation.scale = GlTFExporter::CVector3(10, 10, 10);
+                // make things move
+                pTransformedModel->transformation.translation = GlTFExporter::CVector3((j - 3) * 10 * k, i, (j + 3) * 10 * k);
+                pTransformedModel->transformation.scale = GlTFExporter::CVector3(5, 5, 5);
             
-            // add this instance to the exporter
-            exporter.addTransformedModelToGroup(pTransformedModel, pRootGroup);
+                // add this instance to the exporter
+                exporter.addTransformedModelToGroup(pTransformedModel, pSubGroup);
+                shittyCounter++;
+            }
         }
+        
         // add subgroup to the root group cause its broken and rootgroup MUST contain all other groups and idk why
         pRootGroup->addGroup(pSubGroup);
     }
