@@ -59,6 +59,10 @@ class GlTFExporter;
 class GlTFExporter
 {
 public:
+   enum ErrorEnum : int
+   {
+      InvalidId = -1
+   };
 
    enum class TextureSlot
    {
@@ -129,7 +133,7 @@ public:
    {
    public:
       float x{ 0 }, y{ 0 }, z{ 0 }, w{ 0 };
-      CVector4(float x, float y, float z, float w){ this->x = x; this->y = y; this->z = z; this->w = w;}
+      CVector4(float x, float y, float z, float w){ this->x = x; this->y = y; this->z = z; this->w = w; }
       CVector4() {}
       ~CVector4() {}
    };
@@ -165,11 +169,11 @@ public:
    class Texture : public std::enable_shared_from_this<Texture>
    {
    public:
-      uint32_t id{ 0 };
+      int32_t id{ ErrorEnum::InvalidId };
       uint32_t width{ 0 };
       uint32_t height{ 0 };
 
-      int glTextureId{ -1 };
+      int32_t glTextureId{ ErrorEnum::InvalidId };
 
       TextureFormat format; // DXT1, DXT5, A8R8G8B8, X8R8G8B8, etc..
 
@@ -184,7 +188,7 @@ public:
    class Material : public std::enable_shared_from_this<Material>
    {
    public:
-      uint32_t id{ 0 };
+      int32_t id{ ErrorEnum::InvalidId };
       std::string name;
       std::string filePath;
       
@@ -197,8 +201,8 @@ public:
    class Mesh : public std::enable_shared_from_this<Mesh>
    {
    public:
-      uint32_t id{ 0 };
-      uint32_t materialRef{ 0 };
+      int32_t id{ ErrorEnum::InvalidId };
+      int32_t materialRef{ ErrorEnum::InvalidId };
       std::string name;
       std::vector<CVector3> vertices;
       std::vector<CVector2> uv1, uv2, uv3, uv4;
@@ -235,10 +239,10 @@ public:
    class Model : public std::enable_shared_from_this<Model>
    {
    public:
-      uint32_t id{ 0 };
+      int32_t id{ ErrorEnum::InvalidId };
       std::string name;
 
-      int glBufferId{ 0 };
+      int32_t glBufferId{ ErrorEnum::InvalidId };
       std::vector<uint32_t> glMeshIds;
       
       std::map<int, MeshPtr> meshes;
@@ -250,16 +254,16 @@ public:
    class TransformedModel : public std::enable_shared_from_this<TransformedModel>
    {
    public:
-      uint32_t id;
-      uint32_t modelRef;
+      int32_t id{ ErrorEnum::InvalidId };
+      int32_t modelRef{ ErrorEnum::InvalidId };
       Transform transformation;
    };
 
    class Group : public std::enable_shared_from_this<Group>
    {
    public:
-      uint32_t id{ 0 };
-      uint32_t type{ 1 };
+      int32_t id{ ErrorEnum::InvalidId };
+      int32_t type{ ErrorEnum::InvalidId };
       std::string name;
       Transform transformation;
       std::vector<TransformedModelPtr> models;
@@ -267,9 +271,11 @@ public:
 
       Group() {}
       ~Group() {}
+
+      // todo: this is fuckin stupid, fix it legit
+      // adds a subgroup to group, copies models if this group already exists here
       void addGroup(GroupPtr pGroup)
       {
-         // todo: this is fuckin stupid, fix it legit
          for (auto pSubGroup : subGroups)
             if (pSubGroup->name == pGroup->name)
             {
@@ -283,38 +289,38 @@ public:
       }
    };
    
-   std::map<std::string, uint32_t> nameCount;
+   std::map<std::string, int32_t> nameCount;
 
-   std::map<std::string, uint32_t> textureNameRefMap;
-   std::map<std::string, uint32_t> materialNameRefMap;
-   std::map<std::string, uint32_t> meshNameRefMap;
-   std::map<std::string, uint32_t> modelNameRefMap;
-   std::map<std::string, uint32_t> groupNameRefMap;
+   std::map<std::string, int32_t> textureNameRefMap;
+   std::map<std::string, int32_t> materialNameRefMap;
+   std::map<std::string, int32_t> meshNameRefMap;
+   std::map<std::string, int32_t> modelNameRefMap;
+   std::map<std::string, int32_t> groupNameRefMap;
 
-   std::map<uint32_t, TexturePtr> textureIdMap;
-   std::map<uint32_t, MaterialPtr> materialIdMap;
-   std::map<uint32_t, MeshPtr> meshIdMap;
-   std::map<uint32_t, ModelPtr> modelIdMap;
-   std::map<uint32_t, GroupPtr> groupIdMap;
+   std::map<int32_t, TexturePtr> textureIdMap;
+   std::map<int32_t, MaterialPtr> materialIdMap;
+   std::map<int32_t, MeshPtr> meshIdMap;
+   std::map<int32_t, ModelPtr> modelIdMap;
+   std::map<int32_t, GroupPtr> groupIdMap;
 
    std::string exportDir;
 
    void reset();
-   uint32_t addTransformedModelToGroup(TransformedModelPtr pModel, GroupPtr pGroup);
+   int32_t addTransformedModelToGroup(TransformedModelPtr pModel, GroupPtr pGroup);
    
-   uint32_t addMeshToModel(MeshPtr pMesh, ModelPtr pModel);
+   int32_t addMeshToModel(MeshPtr pMesh, ModelPtr pModel);
    MeshPtr getMesh(const std::string& name) const;
    
-   uint32_t addModel(ModelPtr pModel);
+   int32_t addModel(ModelPtr pModel);
    ModelPtr getModel(const std::string& name) const;
    
-   uint32_t addGroup(GroupPtr pGroup);
+   int32_t addGroup(GroupPtr pGroup);
    GroupPtr getGroup(const std::string& name) const;
 
-   uint32_t addMaterialToMesh(MaterialPtr pMaterial, MeshPtr pMesh);
+   int32_t addMaterialToMesh(MaterialPtr pMaterial, MeshPtr pMesh);
    MaterialPtr getMaterial(const std::string& name);
 
-   uint32_t addTextureToMaterial(TexturePtr pTexture, MaterialPtr pMaterial, TextureSlot slot);
+   int32_t addTextureToMaterial(TexturePtr pTexture, MaterialPtr pMaterial, TextureSlot slot);
    TexturePtr getTexture(const std::string& name);
 
    void exportAllMaterials();
@@ -326,12 +332,12 @@ public:
    void exportGlTFTransformedModel(TransformedModelPtr pTransformedModel, GlTFModelPtr pGlModel, tinygltf::Node* pParentNode, tinygltf::Scene* pScene);
    void exportGlTFGroup(GroupPtr pGroup, GlTFModelPtr pGlModel, tinygltf::Node* pParentNode, tinygltf::Scene* pScene);
 
-   void doExport(const std::string& fileName, const std::string& exportDirectory);
+   void doExport(const std::string& fileName, const std::string& exportDirectory, bool prettyPrint = true);
 
 
 
    GlTFExporter() = default;
-   ~GlTFExporter();
+   ~GlTFExporter(){}
    GlTFExporter(const GlTFExporter&) = delete;
    GlTFExporter& operator=(const GlTFExporter&) = delete;
 };
