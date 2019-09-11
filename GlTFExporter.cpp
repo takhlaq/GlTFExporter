@@ -577,8 +577,8 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
    if (exportDir[exportDir.size() - 1] != '/' && exportDir[exportDir.size() - 1] != '\\')
       exportDir += "/";
 
-   if (!std::experimental::filesystem::exists(exportDir))
-      std::experimental::filesystem::create_directories(exportDir);
+   if (!std::filesystem::exists(exportDir))
+      std::filesystem::create_directories(exportDir);
       
    if (scene.name == "")
       scene.name = "out.gltf";
