@@ -6314,7 +6314,8 @@ static void SerializeGltfMaterial(Material &material, json &o) {
     json pbrMetallicRoughness;
     SerializeGltfPbrMetallicRoughness(material.pbrMetallicRoughness,
                                       pbrMetallicRoughness);
-    JsonAddMember(o, "pbrMetallicRoughness", std::move(pbrMetallicRoughness));
+    if (pbrMetallicRoughness != nullptr)
+      JsonAddMember(o, "pbrMetallicRoughness", std::move(pbrMetallicRoughness));
   }
 
 #if 0  // legacy way. just for the record.
