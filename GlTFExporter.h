@@ -73,6 +73,8 @@ public:
       Occlusion,
       Ambient,
       MetallicRoughness,
+
+      MAX_TEXTURE_SLOT
    };
    
    enum class TextureFormat

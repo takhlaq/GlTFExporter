@@ -350,8 +350,8 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
    if (!debugStr.empty())
    {
       std::string debugStr2("MATERIAL: " + pMaterial->name + " ID: " + std::to_string(pGlModel->materials.size()) + "\n");
-      debugStr2 += debugStr;
-      std::ofstream file(exportDir + "UNASSIGNED_TEXTURES_" + pMaterial->name + ".txt", std::ios::trunc);
+      debugStr2 += debugStr + "\n\n";
+      std::ofstream file(exportDir + "GlTFExporter_DEBUG.txt", std::ios::app);
       file.write(debugStr2.c_str(), debugStr2.size());
    }
    pGlModel->materials.push_back(glMat);
