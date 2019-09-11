@@ -43,10 +43,6 @@
 //using TransformedModelPtr = GlTFExporter::TransformedModelPtr;
 //using GroupPtr = GlTFExporter::GroupPtr;
 
-GlTFExporter::~GlTFExporter()
-{
-   //reset();
-}
 
 void GlTFExporter::reset()
 {
@@ -71,16 +67,18 @@ void GlTFExporter::reset()
       meshIdMap.clear();
    if (!meshNameRefMap.empty())
       meshNameRefMap.clear();
+   if (!nameCount.empty())
+      nameCount.clear();
 }
 
-uint32_t GlTFExporter::addTransformedModelToGroup(TransformedModelPtr pModel, GroupPtr pGroup)
+int32_t GlTFExporter::addTransformedModelToGroup(TransformedModelPtr pModel, GroupPtr pGroup)
 {
    pGroup->models.push_back(pModel);
    pModel->id = pGroup->models.size();
    return pModel->id;
 }
 
-uint32_t GlTFExporter::addMeshToModel(MeshPtr pMesh, ModelPtr pModel)
+int32_t GlTFExporter::addMeshToModel(MeshPtr pMesh, ModelPtr pModel)
 {
    auto it = meshNameRefMap.find(pMesh->name);
 
@@ -121,7 +119,7 @@ GlTFExporter::MeshPtr GlTFExporter::getMesh(const std::string& name) const
 }
 
 // add model or return id
-uint32_t GlTFExporter::addModel(ModelPtr pModel)
+int32_t GlTFExporter::addModel(ModelPtr pModel)
 {
    auto it = modelNameRefMap.find(pModel->name);
 
@@ -148,7 +146,7 @@ GlTFExporter::ModelPtr GlTFExporter::getModel(const std::string& name) const
 }
 
 // add group or return id
-uint32_t GlTFExporter::addGroup(GroupPtr pGroup)
+int32_t GlTFExporter::addGroup(GroupPtr pGroup)
 {
    auto it = groupNameRefMap.find(pGroup->name);
 
@@ -170,7 +168,7 @@ GlTFExporter::GroupPtr GlTFExporter::getGroup(const std::string& name) const
 }
 
 // add material or get id
-uint32_t GlTFExporter::addMaterialToMesh(MaterialPtr pMaterial, MeshPtr pMesh)
+int32_t GlTFExporter::addMaterialToMesh(MaterialPtr pMaterial, MeshPtr pMesh)
 {
    auto it = materialNameRefMap.find(pMaterial->name);
    if (it == materialNameRefMap.end())
@@ -197,7 +195,7 @@ GlTFExporter::MaterialPtr GlTFExporter::getMaterial(const std::string& name)
    return materialIdMap[it->second];
 }
 
-uint32_t GlTFExporter::addTextureToMaterial(TexturePtr pTexture, MaterialPtr pMaterial, TextureSlot slot)
+int32_t GlTFExporter::addTextureToMaterial(TexturePtr pTexture, MaterialPtr pMaterial, TextureSlot slot)
 {
    auto it = textureNameRefMap.find(pMaterial->name);
    if (it == textureNameRefMap.end())
@@ -247,7 +245,7 @@ std::vector<double> vec4ToDoubleVec(const GlTFExporter::CVector4& v)
 
 void GlTFExporter::exportGlTFTexture(TexturePtr pTexture, tinygltf::Material* pGlMat, tinygltf::TextureInfo* pGlTexInfo, GlTFModelPtr pGlModel)
 {
-   if (pTexture->glTextureId == -1)
+   if (pTexture->glTextureId == GlTFExporter::ErrorEnum::InvalidId)
    {
       pTexture->glTextureId = pGlModel->textures.size();
 
@@ -280,6 +278,7 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
    glMat.name = pMaterial->name;
    glMat.doubleSided = true;
    
+   std::string debugStr;
    for (const auto& slotTexPair : pMaterial->textureMap)
    {
       tinygltf::TextureInfo glTexInfo;
@@ -293,6 +292,11 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
          if (pTex)
          {
             exportGlTFTexture(pTex, &glMat, &glTexInfo, pGlModel);
+            
+            // probably throw here
+            if (pTex->id == GlTFExporter::ErrorEnum::InvalidId)
+               continue;
+
             auto& glTex = pGlModel->textures.at(pTex->glTextureId);
 
             glTexInfo.index = pTex->glTextureId;
@@ -333,12 +337,22 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
                   glMat.pbrMetallicRoughness.metallicRoughnessTexture = glTexInfo;
                }
                default:
-                  glMat.extras.Keys().push_back("UNKNOWN_TEXTURE_" + pTex->filePath);
-                  break;
+               {
+                  debugStr += "TEXTURE: " + pTex->name + " ID: " + std::to_string(pTex->glTextureId) + "\n";
+               }
+               break;
             }
          }
          //texCoordIndex++;
       }
+   }
+
+   if (!debugStr.empty())
+   {
+      std::string debugStr2("MATERIAL: " + pMaterial->name + " ID: " + std::to_string(pGlModel->materials.size()) + "\n");
+      debugStr2 += debugStr;
+      std::ofstream file(exportDir + "UNASSIGNED_TEXTURES_" + pMaterial->name + ".txt", std::ios::trunc);
+      file.write(debugStr2.c_str(), debugStr2.size());
    }
    pGlModel->materials.push_back(glMat);
 }
@@ -373,12 +387,12 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
    tinygltf::Node glNode;
    tinygltf::Mesh glMesh;
 
-   glNode.name = pModel->name;
+   glNode.name = pModel->name + "_" + std::to_string(nameCount[pModel->name]++);
    glNode.translation = vec3ToDoubleVec(pModel->transformation.translation);
    glNode.rotation = vec4ToDoubleVec(pModel->transformation.rotation);
    glNode.scale = vec3ToDoubleVec(pModel->transformation.scale);
 
-   glMesh.name = pModel->name;
+   glMesh.name = glNode.name;
 
    for (const auto& meshPair : pModel->meshes)
    {
@@ -395,11 +409,14 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
       }
 
       {
-         auto pMaterial = materialIdMap[pMesh->materialRef];
-         uint32_t oldMaterialIndex = pGlModel->materials.size();
-         exportGlTFMaterial(pMaterial, pGlModel);
-         if (oldMaterialIndex != pGlModel->materials.size())
-            glPrim.material = pGlModel->materials.size() - 1;
+         auto pMaterial = getMaterial(pMesh->name);
+         if (pMaterial)
+         {
+            uint32_t oldMaterialIndex = pGlModel->materials.size();
+            exportGlTFMaterial(pMaterial, pGlModel);
+            if (oldMaterialIndex != pGlModel->materials.size())
+               glPrim.material = pGlModel->materials.size() - 1;
+         }
       }
 
       // buffers
@@ -416,8 +433,11 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
       uint32_t normLen = pMesh->normals.size() * normStride; // count * sizeof(float) * (x ,y, z)
       uint32_t colorsLen = pMesh->colors.size() * colorsStride; // count * sizeof(float) * (x, y, z, w)
 
-      auto pushBvAccPair = [&](const std::string& name, uint32_t stride, uint32_t numElements, char* pData, uint32_t len) -> std::pair< tinygltf::BufferView*, tinygltf::Accessor* >
+      auto pushBvAccPair = [&](const std::string& name, uint32_t stride, uint32_t numElements, char* pData, uint32_t len)
       {
+         if (numElements == 0)
+            return;
+
          uint32_t length = len;
 
          tinygltf::BufferView glBv;
@@ -477,27 +497,27 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
 
          bufferViewId = pGlModel->bufferViews.size();
 
-         return std::make_pair(&pGlModel->bufferViews.at(pGlModel->bufferViews.size() - 1), &pGlModel->accessors.at(pGlModel->accessors.size() - 1));
+         //return std::make_pair(&pGlModel->bufferViews.at(pGlModel->bufferViews.size() - 1), &pGlModel->accessors.at(pGlModel->accessors.size() - 1));
       };
 
 
       {
-         auto pair = pushBvAccPair("INDICES", indicesStride, pMesh->indices.size(), (char*)pMesh->indices.data(), indicesLen);
+         pushBvAccPair("INDICES", indicesStride, pMesh->indices.size(), (char*)pMesh->indices.data(), indicesLen);
       }
       {
-         auto pair = pushBvAccPair("POSITION", vertsStride, pMesh->vertices.size(), (char*)pMesh->vertices.data(), vertsLen);
+         pushBvAccPair("POSITION", vertsStride, pMesh->vertices.size(), (char*)pMesh->vertices.data(), vertsLen);
       }
       {
-         auto pair = pushBvAccPair("TEXCOORD_0", uvStride, pMesh->uv1.size(), (char*)pMesh->uv1.data(), uv1Len);
+         pushBvAccPair("TEXCOORD_0", uvStride, pMesh->uv1.size(), (char*)pMesh->uv1.data(), uv1Len);
       }
       {
-         auto pair = pushBvAccPair("TEXCOORD_1", uvStride, pMesh->uv2.size(), (char*)pMesh->uv2.data(), uv2Len);
+         pushBvAccPair("TEXCOORD_1", uvStride, pMesh->uv2.size(), (char*)pMesh->uv2.data(), uv2Len);
       }
       {
-         auto pair = pushBvAccPair("NORMAL", normStride, pMesh->normals.size(), (char*)pMesh->normals.data(), normLen);
+         pushBvAccPair("NORMAL", normStride, pMesh->normals.size(), (char*)pMesh->normals.data(), normLen);
       }
       {
-         auto pair = pushBvAccPair("COLOR_0", colorsStride, pMesh->colors.size(), (char*)pMesh->colors.data(), colorsLen);
+         pushBvAccPair("COLOR_0", colorsStride, pMesh->colors.size(), (char*)pMesh->colors.data(), colorsLen);
       }
 
       glMesh.primitives.push_back(glPrim);
@@ -518,7 +538,6 @@ void GlTFExporter::exportGlTFTransformedModel(TransformedModelPtr pTransformedMo
    glTNode.translation = vec3ToDoubleVec(tform.translation);
    glTNode.rotation = vec4ToDoubleVec(tform.rotation);
    glTNode.scale = vec3ToDoubleVec(tform.scale);
-   glTNode.name = modelIdMap[pTransformedModel->modelRef]->name;
 
    // get the actual model's node and add this as a child
    {
@@ -527,6 +546,8 @@ void GlTFExporter::exportGlTFTransformedModel(TransformedModelPtr pTransformedMo
       glTNode.mesh = pModel->glBufferId;
       
       modelNode.children.push_back(pGlModel->nodes.size());
+      glTNode.name = pModel->name + "_" + std::to_string(nameCount[pModel->name]++);;
+
    }
 
    if (pScene)
@@ -544,7 +565,7 @@ void GlTFExporter::exportGlTFGroup(GroupPtr pGroup, GlTFModelPtr pGlModel, tinyg
    std::shared_ptr<tinygltf::Node> glGroupNodePtr = std::make_shared<tinygltf::Node>();
 
    tinygltf::Node& glGroupNode = *glGroupNodePtr.get();
-   glGroupNode.name = pGroup->name;
+   glGroupNode.name = pGroup->name + "_" + std::to_string(nameCount[pGroup->name]++);
    glGroupNode.translation = vec3ToDoubleVec(tform.translation);
    glGroupNode.rotation = vec4ToDoubleVec(tform.rotation);
    glGroupNode.scale = vec3ToDoubleVec(tform.scale);
@@ -565,11 +586,11 @@ void GlTFExporter::exportGlTFGroup(GroupPtr pGroup, GlTFModelPtr pGlModel, tinyg
    pGlModel->nodes.push_back(glGroupNode);
 }
 
-void GlTFExporter::doExport(const std::string& fileName, const std::string& exportDirectory)
+void GlTFExporter::doExport(const std::string& fileName, const std::string& exportDirectory, bool prettyPrint)
 {
    tinygltf::Scene scene;
    scene.name = fileName;
-
+   
    exportDir = exportDirectory;
    if (exportDir == "")
       exportDir = "./";
@@ -584,6 +605,7 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
       scene.name = "out.gltf";
 
    std::shared_ptr<tinygltf::Model> pGlModel = std::make_shared<tinygltf::Model>();
+   pGlModel->defaultScene = 0;
 
    tinygltf::Asset asset;
 
@@ -611,5 +633,5 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
    std::string jsonFileName = fileName;
 
    tinygltf::TinyGLTF loader;
-   loader.WriteGltfSceneToFile(pGlModel.get(), exportDir + jsonFileName, false, true, true, false);
+   loader.WriteGltfSceneToFile(pGlModel.get(), exportDir + jsonFileName, false, true, prettyPrint, false);
 }
