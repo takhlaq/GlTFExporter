@@ -213,7 +213,7 @@ public:
       Mesh() {}
       ~Mesh() {}
 
-      bool Mesh::operator== (const Mesh& rhs) const
+      bool operator== (const Mesh& rhs) const
       {
          return id == rhs.id || name == rhs.name;
       }
@@ -326,7 +326,7 @@ public:
    void exportAllMaterials();
 
 
-   void GlTFExporter::exportGlTFTexture(TexturePtr pTexture, tinygltf::Material* pGlMat, tinygltf::TextureInfo* pGlTexInfo, GlTFModelPtr pGlModel);
+   void exportGlTFTexture(TexturePtr pTexture, tinygltf::Material* pGlMat, tinygltf::TextureInfo* pGlTexInfo, GlTFModelPtr pGlModel);
    void exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlModel);
    void exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel);
    void exportGlTFTransformedModel(TransformedModelPtr pTransformedModel, GlTFModelPtr pGlModel, tinygltf::Node* pParentNode, tinygltf::Scene* pScene);
