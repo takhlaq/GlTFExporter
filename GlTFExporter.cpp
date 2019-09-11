@@ -340,8 +340,8 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
                }
                default:
                {
-                  std::string debugStr("MATERIAL: " + pMaterial->name + "\n");
-                  debugStr += "TEXTURE: " + pTex->name + "\n";
+                  std::string debugStr("MATERIAL: " + pMaterial->name + " ID: " + std::to_string(pGlModel->materials.size()) + "\n");
+                  debugStr += "TEXTURE: " + pTex->name + " ID: " + std::to_string(pTex->glTextureId) + "\n";
                   file.write(debugStr.c_str(), debugStr.size());
                      //glMat.extensions["UNKNOWN_TEXTURE_SLOT_" + pTex->name].Keys().push_back(pTex->name);
                }
