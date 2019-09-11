@@ -209,7 +209,7 @@ public:
       Mesh() {}
       ~Mesh() {}
 
-      bool Mesh::operator== (const Mesh& rhs) const
+      bool operator== (const Mesh& rhs) const
       {
          return id == rhs.id || name == rhs.name;
       }
