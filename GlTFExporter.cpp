@@ -547,7 +547,6 @@ void GlTFExporter::exportGlTFTransformedModel(TransformedModelPtr pTransformedMo
       
       modelNode.children.push_back(pGlModel->nodes.size());
       glTNode.name = pModel->name + "_" + std::to_string(nameCount[pModel->name]++);;
-
    }
 
    if (pScene)
@@ -617,11 +616,19 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
 
    for (auto& group : groupIdMap)
    {
-      tinygltf::Node rootGroupNode;
-      exportGlTFGroup(group.second, pGlModel, &rootGroupNode, &scene);
-      pGlModel->nodes.push_back(rootGroupNode);
+      //tinygltf::Node rootGroupNode;
+      exportGlTFGroup(group.second, pGlModel, nullptr, &scene);
+      //pGlModel->nodes.push_back(rootGroupNode);
    }
 
+   for (auto& model : modelIdMap)
+   {
+      auto& node = pGlModel->nodes[model.second->glBufferId];
+      if (node.children.size() == 0)
+      {
+         node.mesh = model.second->glBufferId;
+      }
+   }
    asset.generator = "takhlaq/GlTFExporter";
    asset.version = "2.0";
    asset.copyright = "lmao";
