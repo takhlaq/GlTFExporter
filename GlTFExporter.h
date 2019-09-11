@@ -105,7 +105,7 @@ public:
       float x{ 0 }, y{ 0 };
       CVector2(float x, float y){ this->x = x; this->y = y; }
       CVector2() {}
-      ~CVector2();
+      ~CVector2() {};
    };
    class CVector3
    {
@@ -113,7 +113,7 @@ public:
       float x{ 0 }, y{ 0 }, z{ 0 };
       CVector3(float x, float y, float z){ this->x = x; this->y = y; this->z = z; }
       CVector3() {}
-      ~CVector3();
+      ~CVector3() {};
 
       CVector3 Min(const CVector3& rhs) const
       {
@@ -131,7 +131,7 @@ public:
       float x{ 0 }, y{ 0 }, z{ 0 }, w{ 0 };
       CVector4(float x, float y, float z, float w){ this->x = x; this->y = y; this->z = z; this->w = w;}
       CVector4() {}
-      ~CVector4();
+      ~CVector4() {};
    };
    #endif
 
