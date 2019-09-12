@@ -534,26 +534,38 @@ void GlTFExporter::exportGlTFTransformedModel(TransformedModelPtr pTransformedMo
    static uint32_t childNodeId = 0;
    auto& tform = pTransformedModel->transformation;
 
+   // get the actual model's node and add this as a child
+
+   // transformed model
    tinygltf::Node glTNode;
    glTNode.translation = vec3ToDoubleVec(tform.translation);
    glTNode.rotation = vec4ToDoubleVec(tform.rotation);
    glTNode.scale = vec3ToDoubleVec(tform.scale);
 
-   // get the actual model's node and add this as a child
-   {
-      auto pModel = modelIdMap[pTransformedModel->modelRef];
-      auto modelNode = pGlModel->nodes[pModel->glBufferId];
-      glTNode.mesh = pModel->glBufferId;
-      
-      modelNode.children.push_back(pGlModel->nodes.size());
-      glTNode.name = pModel->name + "_" + std::to_string(nameCount[pModel->name]++);;
-   }
+   auto pModel = modelIdMap[pTransformedModel->modelRef];
+   auto& modelNode = pGlModel->nodes[pModel->glBufferId];
+
+   // apply the base model's transformations
+   tinygltf::Node glTSubNode;
+   glTSubNode.translation = vec3ToDoubleVec(pModel->transformation.translation);
+   glTSubNode.rotation = vec4ToDoubleVec(pModel->transformation.rotation);
+   glTSubNode.scale = vec3ToDoubleVec(pModel->transformation.scale);
+   glTSubNode.mesh = pModel->glBufferId;
+
+   //modelNode.children.push_back(pGlModel->nodes.size());
+   glTNode.name = pModel->name + "_" + std::to_string(nameCount[pModel->name]++);
+   glTSubNode.name = glTNode.name + "_mesh";
+
+   // add the base model so transformations apply correctly
+   glTNode.children.push_back(pGlModel->nodes.size());
+
+   pGlModel->nodes.push_back(glTSubNode);
 
    if (pScene)
       pScene->nodes.push_back(pGlModel->nodes.size());
    if (pParentNode)
       pParentNode->children.push_back(pGlModel->nodes.size());
-   
+
    pGlModel->nodes.push_back(glTNode);
 }
 
@@ -582,7 +594,9 @@ void GlTFExporter::exportGlTFGroup(GroupPtr pGroup, GlTFModelPtr pGlModel, tinyg
    if (pGroup->subGroups.size() > 0)
       pScene->nodes.push_back(pGlModel->nodes.size());
    
-   pGlModel->nodes.push_back(glGroupNode);
+   // dont add empty groups
+   if (pGroup->subGroups.size() > 0 || pGroup->models.size() > 0)
+      pGlModel->nodes.push_back(glGroupNode);
 }
 
 void GlTFExporter::doExport(const std::string& fileName, const std::string& exportDirectory, bool prettyPrint)
