@@ -73,6 +73,7 @@ public:
       Occlusion,
       Ambient,
       MetallicRoughness,
+      MetallicBase,
 
       MAX_TEXTURE_SLOT
    };
@@ -183,7 +184,7 @@ public:
       std::string filePath;
       std::vector<uint8_t> data;
 
-      Texture(){}
+      Texture() {}
       ~Texture() {}
    };
 
@@ -193,7 +194,10 @@ public:
       int32_t id{ ErrorEnum::InvalidId };
       std::string name;
       std::string filePath;
-      
+
+      int32_t glMaterialId{ ErrorEnum::InvalidId };
+
+
       std::map<TextureSlot, std::vector<TexturePtr>> textureMap; // <slot, <textures>>
 
       Material() {}
@@ -205,6 +209,9 @@ public:
    public:
       int32_t id{ ErrorEnum::InvalidId };
       int32_t materialRef{ ErrorEnum::InvalidId };
+
+      int32_t glMeshId{ ErrorEnum::InvalidId };
+
       std::string name;
       std::vector<CVector3> vertices;
       std::vector<CVector2> uv1, uv2, uv3, uv4;
@@ -215,7 +222,7 @@ public:
       Mesh() {}
       ~Mesh() {}
 
-      bool operator== (const Mesh& rhs) const
+      bool Mesh::operator== (const Mesh& rhs) const
       {
          return id == rhs.id || name == rhs.name;
       }
@@ -227,8 +234,8 @@ public:
       CVector3 translation = CVector3(0, 0, 0);
       CVector4 rotation = CVector4(0, 0, 0, 1);
       CVector3 scale = CVector3(1, 1, 1);
-      
-      Transform(){}
+
+      Transform() {}
       Transform(CVector3 translation, CVector4 rotation, CVector3 scale)
       {
          this->translation = translation;
@@ -243,10 +250,11 @@ public:
    public:
       int32_t id{ ErrorEnum::InvalidId };
       std::string name;
+      std::string resourceName;
 
       int32_t glBufferId{ ErrorEnum::InvalidId };
       std::vector<uint32_t> glMeshIds;
-      
+
       std::map<int, MeshPtr> meshes;
       Transform transformation;
       Model() {}
@@ -258,6 +266,10 @@ public:
    public:
       int32_t id{ ErrorEnum::InvalidId };
       int32_t modelRef{ ErrorEnum::InvalidId };
+
+      int32_t glNodeId{ ErrorEnum::InvalidId };
+      int32_t glChildNodeId{ ErrorEnum::InvalidId };
+
       Transform transformation;
    };
 
@@ -266,6 +278,9 @@ public:
    public:
       int32_t id{ ErrorEnum::InvalidId };
       int32_t type{ ErrorEnum::InvalidId };
+
+      int32_t glNodeId{ ErrorEnum::InvalidId };
+
       std::string name;
       Transform transformation;
       std::vector<TransformedModelPtr> models;

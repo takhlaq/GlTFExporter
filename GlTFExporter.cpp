@@ -173,7 +173,7 @@ int32_t GlTFExporter::addMaterialToMesh(MaterialPtr pMaterial, MeshPtr pMesh)
    auto it = materialNameRefMap.find(pMaterial->name);
    if (it == materialNameRefMap.end())
    {
-      pMaterial->name = pMesh->name;
+      //pMaterial->name = pMesh->name;
       pMaterial->id = materialNameRefMap.size();
       materialNameRefMap.emplace(std::make_pair(pMaterial->name, pMaterial->id));
       materialIdMap[pMaterial->id] = pMaterial;
@@ -265,20 +265,28 @@ void GlTFExporter::exportGlTFTexture(TexturePtr pTexture, tinygltf::Material* pG
       glImg.width = pTexture->width;
       glImg.height = pTexture->height;
       glImg.uri = pTexture->filePath;
-      
+
       pGlModel->images.push_back(glImg);
    }
 }
 
 void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlModel)
 {
-   static uint32_t materialId = 0, textureId = 0;
+   // throw?
+   if (pMaterial->glMaterialId != GlTFExporter::ErrorEnum::InvalidId) return;
+
+   pMaterial->glMaterialId = pGlModel->materials.size();
 
    tinygltf::Material glMat;
    glMat.name = pMaterial->name;
    glMat.doubleSided = true;
-   
+
    std::string debugStr;
+
+   tinygltf::ExtensionMap pbrSpecMap;
+   tinygltf::ExtensionMap pbrDiffuseTexMap;
+   tinygltf::ExtensionMap pbrSpecTexMap;
+
    for (const auto& slotTexPair : pMaterial->textureMap)
    {
       tinygltf::TextureInfo glTexInfo;
@@ -287,12 +295,13 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
 
       auto slotType = slotTexPair.first;
 
+
       for (auto pTex : slotTexPair.second)
       {
          if (pTex)
          {
             exportGlTFTexture(pTex, &glMat, &glTexInfo, pGlModel);
-            
+
             // probably throw here
             if (pTex->id == GlTFExporter::ErrorEnum::InvalidId)
                continue;
@@ -306,46 +315,65 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
             // just dumping whatever i can for now
             switch (slotType)
             {
-               case TextureSlot::Normal:
-               {
-                  tinygltf::NormalTextureInfo glNTexInfo;
-                  glNTexInfo.index = glTexInfo.index;
-                  glNTexInfo.texCoord = glTexInfo.texCoord;
-                  glMat.normalTexture = glNTexInfo;
-               }
-               break;
-               case TextureSlot::Occlusion:
-               {
-                  tinygltf::OcclusionTextureInfo glOTexInfo;
-                  glOTexInfo.index = glTexInfo.index;
-                  glOTexInfo.texCoord = glTexInfo.texCoord;
-                  glMat.occlusionTexture = glOTexInfo;
-               }
-               break;
-               case TextureSlot::Emissive:
-               {
-                  glMat.emissiveTexture = glTexInfo;
-               }
-               break;
-               case TextureSlot::Albedo:
-               {
-                  glMat.pbrMetallicRoughness.baseColorTexture = glTexInfo;
-               }
-               break;
-               case TextureSlot::Specular:
-               {
-                  glMat.pbrMetallicRoughness.metallicRoughnessTexture = glTexInfo;
-               }
-               default:
-               {
-                  debugStr += "TEXTURE: " + pTex->name + " ID: " + std::to_string(pTex->glTextureId) + "\n";
-               }
-               break;
+            case TextureSlot::Normal:
+            {
+               tinygltf::NormalTextureInfo glNTexInfo;
+               glNTexInfo.index = glTexInfo.index;
+               glNTexInfo.texCoord = glTexInfo.texCoord;
+               glMat.normalTexture = glNTexInfo;
             }
+            break;
+            case TextureSlot::Occlusion:
+            {
+               tinygltf::OcclusionTextureInfo glOTexInfo;
+               glOTexInfo.index = glTexInfo.index;
+               glOTexInfo.texCoord = glTexInfo.texCoord;
+               glMat.occlusionTexture = glOTexInfo;
+            }
+            break;
+            case TextureSlot::Emissive:
+            {
+               glMat.emissiveTexture = glTexInfo;
+            }
+            break;
+            case TextureSlot::Albedo:
+            {
+               pbrDiffuseTexMap["index"] = tinygltf::Value(glTexInfo.index);
+            }
+            //break;
+            case TextureSlot::MetallicBase:
+            {
+               glMat.pbrMetallicRoughness.baseColorTexture = glTexInfo;
+            }
+            break;
+            case TextureSlot::Specular:
+            {
+               pbrSpecTexMap["index"] = tinygltf::Value(glTexInfo.index);
+            }
+            break;
+            case TextureSlot::MetallicRoughness:
+            {
+               //glMat.pbrMetallicRoughness.metallicRoughnessTexture = glTexInfo;
+            }
+            break;
+            default:
+            {
+               debugStr += "TEXTURE: " + pTex->name + " ID: " + std::to_string(pTex->glTextureId) + "\n";
+            }
+            break;
+            }
+            texCoordIndex++;
          }
-         //texCoordIndex++;
       }
    }
+
+   if (pbrDiffuseTexMap.size() > 0)
+      pbrSpecMap["diffuseTexture"] = tinygltf::Value(pbrDiffuseTexMap);
+   if (pbrSpecTexMap.size() > 0)
+      pbrSpecTexMap["specularGlossinessTexture"] = tinygltf::Value(pbrSpecTexMap);
+
+   if (pbrSpecMap.size() > 0)
+      glMat.extensions["KHR_materials_pbrSpecularGlossiness"] = tinygltf::Value(pbrSpecMap);
 
    if (!debugStr.empty())
    {
@@ -398,6 +426,8 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
    {
       auto pMesh = meshPair.second;
 
+      pMesh->glMeshId = pGlModel->meshes.size();
+
       tinygltf::Primitive glPrim;
       glPrim.mode = 4;
 
@@ -408,14 +438,15 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
          max = max.Max(v);
       }
 
+      if (pMesh->materialRef != GlTFExporter::ErrorEnum::InvalidId)
       {
-         auto pMaterial = getMaterial(pMesh->name);
+         auto pMaterial = materialIdMap[pMesh->materialRef];
          if (pMaterial)
          {
-            uint32_t oldMaterialIndex = pGlModel->materials.size();
-            exportGlTFMaterial(pMaterial, pGlModel);
-            if (oldMaterialIndex != pGlModel->materials.size())
-               glPrim.material = pGlModel->materials.size() - 1;
+            if (pMaterial->glMaterialId == GlTFExporter::InvalidId) 
+               exportGlTFMaterial(pMaterial, pGlModel);
+            if (pMaterial->glMaterialId != GlTFExporter::InvalidId)
+               glPrim.material = pMaterial->glMaterialId;
          }
       }
 
@@ -556,15 +587,18 @@ void GlTFExporter::exportGlTFTransformedModel(TransformedModelPtr pTransformedMo
    glTNode.name = pModel->name + "_" + std::to_string(nameCount[pModel->name]++);
    glTSubNode.name = glTNode.name + "_mesh";
 
+
    // add the base model so transformations apply correctly
    glTNode.children.push_back(pGlModel->nodes.size());
+   pTransformedModel->glChildNodeId = pGlModel->nodes.size();
 
    pGlModel->nodes.push_back(glTSubNode);
+   pTransformedModel->glNodeId = pGlModel->nodes.size();
 
    if (pScene)
-      pScene->nodes.push_back(pGlModel->nodes.size());
+      pScene->nodes.push_back(pTransformedModel->glNodeId);
    if (pParentNode)
-      pParentNode->children.push_back(pGlModel->nodes.size());
+      pParentNode->children.push_back(pTransformedModel->glNodeId);
 
    pGlModel->nodes.push_back(glTNode);
 }
@@ -583,7 +617,7 @@ void GlTFExporter::exportGlTFGroup(GroupPtr pGroup, GlTFModelPtr pGlModel, tinyg
 
    for (const auto& pModel : pGroup->models)
       exportGlTFTransformedModel(pModel, pGlModel, &glGroupNode, nullptr);
-   
+
    for (const auto& pSubGroup : pGroup->subGroups)
       exportGlTFGroup(pSubGroup, pGlModel, &glGroupNode, pScene);
 
@@ -593,17 +627,21 @@ void GlTFExporter::exportGlTFGroup(GroupPtr pGroup, GlTFModelPtr pGlModel, tinyg
    // only add group nodes to the scene
    if (pGroup->subGroups.size() > 0)
       pScene->nodes.push_back(pGlModel->nodes.size());
-   
+
    // dont add empty groups
    if (pGroup->subGroups.size() > 0 || pGroup->models.size() > 0)
+   {
+      pGroup->glNodeId = pGlModel->nodes.size();
       pGlModel->nodes.push_back(glGroupNode);
+   }
 }
 
 void GlTFExporter::doExport(const std::string& fileName, const std::string& exportDirectory, bool prettyPrint)
 {
    tinygltf::Scene scene;
    scene.name = fileName;
-   
+
+
    exportDir = exportDirectory;
    if (exportDir == "")
       exportDir = "./";
@@ -613,12 +651,13 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
 
    if (!std::filesystem::exists(exportDir))
       std::filesystem::create_directories(exportDir);
-      
+
    if (scene.name == "")
       scene.name = "out.gltf";
 
    std::shared_ptr<tinygltf::Model> pGlModel = std::make_shared<tinygltf::Model>();
    pGlModel->defaultScene = 0;
+   pGlModel->extensionsUsed.push_back("KHR_pbrSpecularGlossiness");
 
    tinygltf::Asset asset;
 
