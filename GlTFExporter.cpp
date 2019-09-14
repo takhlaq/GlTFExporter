@@ -101,7 +101,7 @@ int32_t GlTFExporter::addMeshToModel(MeshPtr pMesh, ModelPtr pModel)
             return currMesh.first;
          }
       }
-      pModel->meshes.emplace(pModel->meshes.size(), pMesh);
+      pModel->meshes.emplace(std::make_pair(pModel->meshes.size(), pMesh));
       //pMesh->modelIndex = pModel->meshes.size();
    }
    return pMesh->id;
@@ -197,7 +197,7 @@ GlTFExporter::MaterialPtr GlTFExporter::getMaterial(const std::string& name)
 
 int32_t GlTFExporter::addTextureToMaterial(TexturePtr pTexture, MaterialPtr pMaterial, TextureSlot slot)
 {
-   auto it = textureNameRefMap.find(pMaterial->name);
+   auto it = textureNameRefMap.find(pTexture->name);
    if (it == textureNameRefMap.end())
    {
       pTexture->id = textureNameRefMap.size();
