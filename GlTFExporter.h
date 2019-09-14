@@ -222,9 +222,11 @@ public:
       Mesh() {}
       ~Mesh() {}
 
-      bool Mesh::operator== (const Mesh& rhs) const
+      bool operator== (const Mesh& rhs) const
       {
-         return id == rhs.id || name == rhs.name;
+         return id == rhs.id || name == rhs.name || (vertices.size() == rhs.vertices.size() &&
+                  uv1.size() == rhs.uv1.size() && uv2.size() == rhs.uv2.size() && colors.size() == rhs.colors.size() &&
+                  normals.size() == rhs.normals.size() && indices.size() == rhs.indices.size());
       }
    };
 
