@@ -43,6 +43,7 @@
 //using TransformedModelPtr = GlTFExporter::TransformedModelPtr;
 //using GroupPtr = GlTFExporter::GroupPtr;
 
+bool embed = false;
 
 void GlTFExporter::reset()
 {
@@ -84,7 +85,7 @@ int32_t GlTFExporter::addMeshToModel(MeshPtr pMesh, ModelPtr pModel)
 
    if (it == meshNameRefMap.end())
    {
-      pMesh->id = modelIdMap.size();
+      pMesh->id = meshIdMap.size();
       meshNameRefMap.emplace(std::make_pair(pMesh->name, pMesh->id));
       meshIdMap[pMesh->id] = pMesh;
    }
@@ -122,6 +123,8 @@ GlTFExporter::MeshPtr GlTFExporter::getMesh(const std::string& name) const
 int32_t GlTFExporter::addModel(ModelPtr pModel)
 {
    auto it = modelNameRefMap.find(pModel->name);
+
+   assert(it == modelNameRefMap.end());
 
    if (it == modelNameRefMap.end())
    {
@@ -249,24 +252,61 @@ void GlTFExporter::exportGlTFTexture(TexturePtr pTexture, tinygltf::Material* pG
    {
       pTexture->glTextureId = pGlModel->textures.size();
 
-      std::string texFilePath(exportDir + pTexture->filePath);
-      std::ofstream of(texFilePath, std::ios::trunc | std::ios::binary);
-      of.write((const char*)pTexture->data.data(), pTexture->data.size());
-      of.close();
-
-
       tinygltf::Texture glTex;
       glTex.source = pGlModel->images.size();
       glTex.name = pTexture->name;
 
-      pGlModel->textures.push_back(glTex);
 
       tinygltf::Image glImg;
       glImg.width = pTexture->width;
       glImg.height = pTexture->height;
       glImg.uri = pTexture->filePath;
+      
+
+
+      if (embed)
+      {
+         switch (pTexture->format)
+         {
+            case TextureFormat::DXT1:
+            case TextureFormat::DXT3:
+            case TextureFormat::DXT5:
+            {
+               glImg.mimeType = "image/vnd-ms.dds";
+               tinygltf::ExtensionMap emap;
+               emap["source"] = tinygltf::Value(glTex.source);
+               glTex.extensions["MSFT_texture_dds"] = tinygltf::Value(emap);
+            }
+            break;
+         case TextureFormat::PNG:
+            glImg.mimeType = "image/png";
+            break;
+         case TextureFormat::BMP:
+            glImg.mimeType = "image/bmp";
+            break;
+         default:
+            break;
+         }
+
+         tinygltf::Buffer glBuf;
+         glBuf.data = pTexture->data;
+
+         tinygltf::BufferView glBufV;
+         glBufV.buffer = pGlModel->buffers.size();
+         
+         pGlModel->bufferViews.push_back(glBufV);
+         pGlModel->buffers.push_back(glBuf);
+      }
+      //else
+      {
+         std::string texFilePath(exportDir + pTexture->filePath);
+         std::ofstream of(texFilePath, std::ios::trunc | std::ios::binary);
+         of.write((const char*)pTexture->data.data(), pTexture->data.size());
+         of.close();
+      }
 
       pGlModel->images.push_back(glImg);
+      pGlModel->textures.push_back(glTex);
    }
 }
 
@@ -286,6 +326,11 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
    tinygltf::ExtensionMap pbrSpecMap;
    tinygltf::ExtensionMap pbrDiffuseTexMap;
    tinygltf::ExtensionMap pbrSpecTexMap;
+
+   std::map<GlTFExporter::TextureSlot, int> exportedSlots;
+
+   std::ofstream mtlFile(exportDir + pMaterial->name + ".mtl", std::ios::trunc);
+   std::string mtlFileStr("newmtl " + pMaterial->name + '\n');
 
    for (const auto& slotTexPair : pMaterial->textureMap)
    {
@@ -309,7 +354,33 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
             auto& glTex = pGlModel->textures.at(pTex->glTextureId);
 
             glTexInfo.index = pTex->glTextureId;
-            glTexInfo.texCoord = texCoordIndex;
+            glTexInfo.texCoord = exportedSlots[slotType];
+
+            std::string mtlType;
+            switch (slotType)
+            {
+            case TextureSlot::Normal:
+               mtlType = "bump";
+               break;
+            case TextureSlot::Albedo:
+               mtlType = "map_Kd";
+               break;
+            case TextureSlot::Specular:
+               mtlType = "map_Ks";
+               break;
+            default:
+               mtlType = "map_Ka";
+               break;
+            }
+
+            mtlFileStr += mtlType + " " + pTex->filePath + "\n";
+
+            if (exportedSlots[slotType] > 0)
+            {
+               exportedSlots[slotType]++;
+               debugStr += "TEXTURE: " + pTex->name + " ID: " + std::to_string(pTex->glTextureId) + "\n";
+               continue;
+            }
 
             // todo: this is fucked
             // just dumping whatever i can for now
@@ -351,9 +422,10 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
                pbrSpecTexMap["index"] = tinygltf::Value(glTexInfo.index);
             }
             break;
+            case TextureSlot::Ambient:
             case TextureSlot::MetallicRoughness:
             {
-               //glMat.pbrMetallicRoughness.metallicRoughnessTexture = glTexInfo;
+               glMat.pbrMetallicRoughness.metallicRoughnessTexture = glTexInfo;
             }
             break;
             default:
@@ -362,6 +434,7 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
             }
             break;
             }
+            exportedSlots[slotType]++;
             texCoordIndex++;
          }
       }
@@ -382,6 +455,7 @@ void GlTFExporter::exportGlTFMaterial(MaterialPtr pMaterial, GlTFModelPtr pGlMod
       std::ofstream file(exportDir + "GlTFExporter_DEBUG.txt", std::ios::app);
       file.write(debugStr2.c_str(), debugStr2.size());
    }
+   mtlFile.write(mtlFileStr.c_str(), mtlFileStr.size());
    pGlModel->materials.push_back(glMat);
 }
 
@@ -477,7 +551,7 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
          glBv.buffer = bufferId;
          glBv.byteLength = length;
          glBv.byteOffset = bufferOffset;
-         glBv.name = pMesh->name + "_" + name + "_VIEW";
+         //glBv.name = pMesh->name + "_" + name + "_VIEW";
 
          glAcc.componentType = TINYGLTF_COMPONENT_TYPE_FLOAT;
          glAcc.type = TINYGLTF_TYPE_VEC3;
@@ -505,7 +579,7 @@ void GlTFExporter::exportGlTFModel(ModelPtr pModel, GlTFModelPtr pGlModel)
          }
 
 
-         glAcc.name = pMesh->name + "_" + name + "_ACCESSOR";
+         //glAcc.name = pMesh->name + "_" + name + "_ACCESSOR";
          glAcc.bufferView = bufferViewId;
          glAcc.byteOffset = 0;
          glAcc.count = numElements;
@@ -655,9 +729,13 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
    if (scene.name == "")
       scene.name = "out.gltf";
 
+   if (scene.name.find(".glb") != -1)
+      embed = true;
+
    std::shared_ptr<tinygltf::Model> pGlModel = std::make_shared<tinygltf::Model>();
    pGlModel->defaultScene = 0;
    pGlModel->extensionsUsed.push_back("KHR_pbrSpecularGlossiness");
+   pGlModel->extensionsUsed.push_back("MSFT_texture_dds");
 
    tinygltf::Asset asset;
 
@@ -677,7 +755,7 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
    for (auto& model : modelIdMap)
    {
       auto& node = pGlModel->nodes[model.second->glBufferId];
-      if (node.children.size() == 0)
+      if (nameCount[model.second->name] < 2)
       {
          node.mesh = model.second->glBufferId;
       }
@@ -693,5 +771,5 @@ void GlTFExporter::doExport(const std::string& fileName, const std::string& expo
    std::string jsonFileName = fileName;
 
    tinygltf::TinyGLTF loader;
-   loader.WriteGltfSceneToFile(pGlModel.get(), exportDir + jsonFileName, false, true, prettyPrint, false);
+   loader.WriteGltfSceneToFile(pGlModel.get(), exportDir + jsonFileName, embed, true, prettyPrint, embed);
 }
